@@ -1,0 +1,1044 @@
+/dts-v1/;
+#include "xgold/sofia_3gr_soc/irq.h"
+#include <dt-bindings/sofiafb/sofia_fb.h>
+/ {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	model = "intel,sofia_3gr_soc-es2";
+	compatible = "intel,sofia_3gr_soc-svb", "intel,xgold";
+
+	#define SOFIA_3GR_GARNET_4_LEVEL_CPUFREQ
+	#include "xgold/sofia_3gr_soc/sofia_3gr_soc_garnet.dtsi"
+	#include "xgold/sofia_3gr_soc/irq.dtsi"
+	#include "xgold/mobilevisor/mobilevisor.dtsi"
+	#include "xgold/sofia_3gr_soc/clock-es1.dtsi"
+	#include "xgold/sofia_3gr_soc/regulator.dtsi"
+	#include "xgold/sofia_3gr_soc/device-pm-reg_garnet.dtsi"
+	#include "xgold/pmic/granite.dtsi"
+	#include "xgold/sofia_3gr_soc/cpufreq.dtsi"
+	chosen {
+	};
+
+	aliases {
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x800000 0x1800000>;
+	};
+
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		/* global autoconfigured region for contiguous allocations */
+		cma_default_region: region@0 {
+			size = <0x03000000>;
+			limit = <0x10000000>;
+			linux,cma-default;
+		};
+		/* special region for secured processing devices */
+		secured_rga_region: region@10000000 {
+			reg = <0x10000000 0x01000000>;
+			no-map;
+			linux,cma;
+                        isolate;
+		};
+		secured_region: region@11000000 {
+			reg = <0x11000000 0x05000000>;
+			no-map;
+			linux,cma;
+		};
+	};
+
+	vmodem {
+		compatible = "intel,vmodem";
+	};
+
+    sim_detect {
+        compatible = "intel,sim_detect";
+        pinctrl-names = "default", "sleep", "inactive";
+#if defined (CONFIG_Z170C) || defined (CONFIG_Z170CG)
+        pinctrl-0 = <&sim1_default_pins &sim2_default_pins>;
+        pinctrl-1 = <&sim1_sleep_pins &sim2_sleep_pins>;
+        pinctrl-2 = <&sim1_inactive_pins &sim2_inactive_pins>;
+        usim1_ccin_o = <&xgold_pmx_gpio 36 0>;
+        usim2_ccin_o = <&xgold_pmx_gpio 15 0>;
+#else
+        pinctrl-0 = <&sim1_default_pins>;
+        pinctrl-1 = <&sim1_sleep_pins>;
+        pinctrl-2 = <&sim1_inactive_pins>;
+        usim1_ccin_o = <&xgold_pmx_gpio 36 0>;
+#endif
+
+    };
+
+#if defined (CONFIG_Z370C) || defined (CONFIG_Z370CG)
+	smart_cover {
+		compatible = "asus,smart_cover";
+		interrupt-parent = <&eint>;
+		interrupts = < EINT_EXI10 XGOLD_IRQ_TYPE_EDGE_BOTH >;
+		pinctrl-names = "default", "sleep", "inactive";
+		pinctrl-0 = <&cover_default_pins>;
+		pinctrl-1 = <&cover_sleep_pins>;
+		pinctrl-2 = <&cover_inactive_pins>;
+		asus,cover-battery-status = <&xgold_pmx_gpio 60 0>;
+		asus,i2c-power-enable = <&xgold_pmx_gpio 15 0>;
+		asus,cover-irq = <&xgold_pmx_gpio 73 0>;
+	};
+#endif
+
+	ion {
+		compatible = "rockchip,ion";
+#ifndef RECOVERY_KERNEL
+		secvm-handler;
+#endif
+		#address-cells = < 1 >;
+		#size-cells = < 0 >;
+		cma-heap {
+			memory-region = <&cma_default_region>;
+			rockchip,ion_heap = < 4 >;
+		};
+		system-heap {
+			rockchip,ion_heap = < 0 >;
+		};
+		secured-rga-heap {
+			memory-region = <&secured_rga_region>;
+			rockchip,ion_heap = < 5 >;
+		};
+		secured-heap {
+			memory-region = <&secured_region>;
+			rockchip,ion_heap = < 6 >;
+		};
+	};
+#if defined (CONFIG_Z370C) || defined (CONFIG_Z370CG)
+        backlight_cadiz:cadiz-backlight {
+                compatible = "asus,cadiz-led";
+		reg = <0xE63002B8 0x4001>;
+		reg-names = "ag620-fsys";
+                intel,flags-use-safe-ctrl;
+                pm,class-name = "bl_class";
+                pm,user-name = "bl";
+                pm,state-D0 = "enable";
+                pm,state-D3 = "disable";
+        };
+#else
+	backlight:agold620-backlight {
+		compatible = "intel,agold620-led";
+		reg = <0xE6501800 0x154
+			0xE6401134 0x4>;
+		reg-names = "pmu-bl", "cgu-bl";
+		intel,flags-use-safe-ctrl;
+		pm,class-name = "bl_class";
+		pm,user-name = "bl";
+		pm,state-D0 = "enable";
+		pm,state-D3 = "disable";
+		intel,led-k2 = <0x143>;
+		intel,led-k1max = <0x120>;
+		intel,led-k2max = <0xFFFF>;
+		intel,led-up = <0x104>;
+		intel,led-down = <0x200>;
+		intel,led-safe = <0x811>;
+		intel,bl-gpio-enable = <&xgold_pmx_gpio 71 0>;
+		pinctrl-names = "default", "sleep", "inactive";
+		pinctrl-0 = <&led_agold_default_pins>;
+		pinctrl-1 = <&led_agold_sleep_pins>;
+		pinctrl-2 = <&led_agold_inactive_pins>;
+        };
+#endif
+
+#ifndef RECOVERY_KERNEL
+	/*headset:headset {
+		compatible = "intel,headset";
+		#address-cells = < 0 >;
+		reg = <0xE6501C00 0x4>;
+		reg-names = "headset-registers";
+		interrupts = < 0 1 >;
+		interrupt-parent = < &headset>;
+		#interrupt-cells = < 1 >;
+		interrupt-map = <
+			 0 &ag620_pmu ABB_PMU_ACD1 XGOLD_IRQ_TYPE_NONE
+			 1 &ag620_pmu ABB_PMU_ACD2 XGOLD_IRQ_TYPE_NONE
+			>;
+		interrupt-names = "acd1", "acd2";
+		io-channel-names = "ACCID_ADC";
+		io-channels = < &meas 4 >;
+	};*/
+#endif
+	fb {
+		compatible = "rockchip,fb";
+		rockchip,disp-mode = <NO_DUAL>;
+		rockchip,loader-logo-on = <1>;
+		rockchip,ion-drv = "rockchip";
+	};
+
+	screen {
+		compatible = "rockchip,screen", "intel,screen";
+		pm,class-name = "generic_class";
+		pm,user-name = "lcd";
+		pm,state-D0 = "enable";
+		pm,state-D3 = "disable";
+#if defined (CONFIG_Z370C) || defined (CONFIG_Z370CG)
+		intel,display-gpio-reset = <&xgold_pmx_gpio 83 0x300>;
+		#include "xgold/display/cpt_hx8394d.dtsi"
+		#include "xgold/display/boe_nt35523b.dtsi"
+#else
+		intel,display-gpio-vhigh = <&xgold_pmx_gpio 45 0>;
+		intel,display-gpio-reset = <&xgold_pmx_gpio 46 0>;
+		#include "xgold/display/boe_tv070wsm.dtsi"
+		#include "xgold/display/kdi_kd070d57.dtsi"
+#endif
+	};
+
+	graphics {
+		compatible = "intel,graphics";
+		intel,gpu-shared-mem = <0x20000000>;
+		intel,dcc-fbpixelformat= "RGB888";
+		intel,dcc-debug-level = <1>;
+		intel,fb-api = <1>;
+#ifdef RECOVERY_KERNEL
+		intel,dcc-mem = < 0x00800000 >;
+#else
+		intel,dcc-use-fences = <1>;
+		intel,dcc-mem = < 0x00400000 >;
+		intel,prot-mem = < 0x08000000 0x08000000>;
+#endif
+	};
+
+
+#ifndef RECOVERY_KERNEL
+	sound {
+		compatible = "intel,xgold-snd-asoc";
+		intel,audio-codec = < &afe >;
+		intel,pcm-audio = <&pcm_music>;
+		intel,pcm-voice = <&pcm_voice>;
+		intel,speech = <&speech_probe>;
+		intel,jack = <&headset>;
+		intel,spk-gpio-sd = <&xgold_pmx_gpio 44 0>;
+	};
+#endif
+	/*hwid {
+		compatible = "intel,gpio-hwid";
+		intel,gpio-hw-id =
+			<&xgold_pmx_gpio 55 0>,
+			<&xgold_pmx_gpio 48 0>;
+	};
+        */
+	
+#if defined (CONFIG_Z370C) || defined (CONFIG_Z370CG)
+#ifndef RECOVERY_KERNEL
+	hallsensor {
+		compatible = "asus,asustek_lid";
+		interrupt-parent = <&eint>;
+		interrupts = < EINT_EXI7 XGOLD_IRQ_TYPE_EDGE_BOTH >;
+		pinctrl-names = "default", "sleep", "inactive";
+		pinctrl-0 = <&hall_default_pins>;
+		pinctrl-1 = <&hall_sleep_pins>;
+		pinctrl-2 = <&hall_inactive_pins>;
+		asus,hallsensor-irq = <&xgold_pmx_gpio 70 0>;
+	};
+#endif //end of RECOVERY_KERNEL
+#endif //end of Z370CG
+};
+
+#if defined (CONFIG_Z170C) || defined (CONFIG_Z170CG)
+&eint {
+	/* intel,virq,x = <0>; means EINTx is owned & requested by IRQ framework */
+	intel,virq,0 = <1>; /* EINT_EXI0: ??? */
+	intel,virq,1 = <0>; /* EINT_EXI1: TOUCH */
+	intel,virq,2 = <0>; /* EINT_EXI2: ??? */
+	intel,virq,3 = <0>; /* EINT_EXI3: ??? */
+	intel,virq,4 = <1>; /* EINT_EXI4 */
+	intel,virq,5 = <0>; /* EINT_EXI5  ACCEL */
+	intel,virq,6 = <0>; /* EINT_EXI6: ??? */
+	intel,virq,7 = <0>; /* EINT_EXI7  CAP */
+	intel,virq,8 = <0>; /* EINT_EXI8 */
+	intel,virq,9 = <0>; /* EINT_EXI9 */
+	intel,virq,10 = <1>; /* EINT_EXI10 */
+	intel,virq,11 = <1>; /* EINT_EXI11 */
+	intel,virq,12 = <1>; /* EINT_EXI12: ??? */
+	intel,virq,13 = <1>; /* EINT_EXI13 */
+	intel,virq,14 = <1>; /* EINT_EXI14 */
+	intel,virq,15 = <1>; /* EINT_EXI15 */
+	intel,virq,16 = <0>; /* EINT_USB_HS_RESUME */
+	intel,virq,17 = <1>; /* EINT_SDMMC_DETECT */
+	intel,virq,18 = <1>; /* EINT_SDIO_DAT3 */
+	intel,virq,19 = <1>; /* EINT_SDIO_DAT1 */
+	intel,virq,20 = <0>; /* EINT_USIF1_WK */
+	intel,virq,21 = <1>; /* EINT_USIF2_WK */
+	intel,virq,22 = <1>; /* EINT_WUP_DBB */
+	intel,virq,23 = <1>; /* EINT_U2H */
+	intel,virq,24 = <1>; /* EINT_G3FP */
+	intel,virq,25 = <1>; /* EINT_DTXS */
+	intel,virq,26 = <1>; /* EINT_DRXS */
+	intel,virq,27 = <1>; /* EINT_WDT0 */
+	intel,virq,28 = <1>; /* EINT_WDT1 */
+	intel,virq,29 = <0>; /* EINT_USB_ID */
+
+	intel,preack,8 = <1>; /* EINT_EXI8 */
+	intel,preack,16 = <1>; /* EINT_USB_HS_RESUME*/
+	intel,preack,20 = <1>; /* EINT_USIF1_WK */
+};
+#endif //end of Z170
+
+#if defined (CONFIG_Z370C) || defined (CONFIG_Z370CG)
+&eint {
+	/* intel,virq,x = <0>; means EINTx is owned & requested by IRQ framework */
+	intel,virq,0 = <1>; /* EINT_EXI0: ??? */
+	intel,virq,1 = <0>; /* EINT_EXI1: TOUCH */
+	intel,virq,2 = <0>; /* EINT_EXI2: ??? */
+	intel,virq,3 = <0>; /* EINT_EXI3: ??? */
+	intel,virq,4 = <1>; /* EINT_EXI4 */
+	intel,virq,5 = <0>; /* EINT_EXI5  ACCEL */
+	intel,virq,6 = <0>; /* EINT_EXI6: ??? */
+	intel,virq,7 = <0>; /* EINT_EXI7  HALL */
+	intel,virq,8 = <0>; /* EINT_EXI8 */
+	intel,virq,9 = <0>; /* EINT_EXI9 */
+	intel,virq,10 = <0>; /* EINT_EXI10 */
+	intel,virq,11 = <1>; /* EINT_EXI11 */
+	intel,virq,12 = <1>; /* EINT_EXI12: ??? */
+	intel,virq,13 = <0>; /* EINT_EXI13  ALS */
+	intel,virq,14 = <1>; /* EINT_EXI14 */
+	intel,virq,15 = <0>; /* EINT_EXI15 */
+	intel,virq,16 = <0>; /* EINT_USB_HS_RESUME */
+	intel,virq,17 = <0>; /* EINT_SDMMC_DETECT */
+	intel,virq,18 = <1>; /* EINT_SDIO_DAT3 */
+	intel,virq,19 = <1>; /* EINT_SDIO_DAT1 */
+	intel,virq,20 = <0>; /* EINT_USIF1_WK */
+	intel,virq,21 = <1>; /* EINT_USIF2_WK */
+	intel,virq,22 = <1>; /* EINT_WUP_DBB */
+	intel,virq,23 = <1>; /* EINT_U2H */
+	intel,virq,24 = <1>; /* EINT_G3FP */
+	intel,virq,25 = <1>; /* EINT_DTXS */
+	intel,virq,26 = <1>; /* EINT_DRXS */
+	intel,virq,27 = <1>; /* EINT_WDT0 */
+	intel,virq,28 = <1>; /* EINT_WDT1 */
+	intel,virq,29 = <0>; /* EINT_USB_ID */
+
+	intel,preack,8 = <1>; /* EINT_EXI8 */
+	intel,preack,16 = <1>; /* EINT_USB_HS_RESUME*/
+	intel,preack,20 = <1>; /* EINT_USIF1_WK */
+};
+#endif //end of Z370
+
+
+&idi_per {
+	#define SOFIA_3GR_GARNET_EVB
+	#include "xgold/agold620/agold620.dtsi"
+};
+
+&bat_hal {
+	#define BAT_TYPE_LC 0
+	#define POWER_SUPPLY_TECHNOLOGY_LION 2
+
+	supp_batids =  < 0 BAT_TYPE_LC >;
+
+	supp_batids-map = "standrd";
+
+	prof-standrd = < POWER_SUPPLY_TECHNOLOGY_LION /*battery_type*/
+				  2885 /*capacity*/
+				  4350 /*voltage_max*/
+				  144 /*chrg_term_ma*/
+				  3200 /*low_batt_mv*/
+				  60 /*disch_tmp_ul*/
+				  0xffffffec /*disch_tmp_ll (-20)*/
+				  0 /*min_temp*/
+				  3 /*min_temp_restart*/
+				  42 /*max_temp_restart*/ >;
+
+	prof-standrd-cap_to_vbat_ocv = <
+		3202 3378 3493 3569 3624 3661 3674 3680 3685 3689
+		3692 3696 3700 3705 3713 3721 3728 3735 3742 3747
+		3752 3758 3763 3767 3770 3773 3776 3778 3780 3782
+		3784 3787 3789 3791 3794 3796 3799 3802 3805 3808
+		3811 3815 3818 3822 3826 3830 3834 3839 3844 3848
+		3854 3859 3865 3871 3877 3884 3891 3899 3907 3915
+		3922 3930 3938 3946 3954 3963 3971 3979 3988 3996
+		4005 4014 4023 4033 4043 4053 4062 4072 4082 4091
+		4102 4112 4122 4133 4143 4154 4165 4176 4187 4198
+		4209 4220 4232 4243 4255 4266 4277 4286 4297 4307
+		4314 >;
+
+
+	prof-standrd-ntemp_ranges = <1>;
+
+	prof-standrd-temp_range0 = < 45 /*max_temp*/
+					     4320 /*full_chrg_vol*/
+					     1500 /*full_chrg_cur*/
+					     98 /*charging_res_cap*/
+					     4320 /*maint_chrg_vol_ul*/
+					     1500 /*maint_chrg_cur*/ >;
+
+	nprofiles = <1>;
+};
+
+#if 0
+&fuel_gauge_hal {
+	sense_resistor_mohm = <20>;
+	gain_error_1_uc_per_mc = <30>;
+	gain_error_2_uc_per_mc = <30>;
+};
+#endif
+
+&usif1 {
+	pinctrl-names = "default", "sleep", "inactive";
+	pinctrl-0 = <&usif1_default_pins>;
+	pinctrl-1 = <&usif1_sleep_pins>;
+	pinctrl-2 = <&usif1_inactive_pins>;
+};
+&usif2 {
+	pinctrl-names = "default", "sleep", "inactive", "reset", "off";
+	pinctrl-0 = <&usif2_default_pins>;
+	pinctrl-1 = <&usif2_sleep_pins>;
+	pinctrl-2 = <&usif2_inactive_pins>;
+	pinctrl-3 = <&usif2_reset_pins>;
+	pinctrl-4 = <&usif2_off_pins>;
+};
+
+&i2c_1 {
+	pinctrl-names = "default", "sleep", "inactive";
+	pinctrl-0 = <&i2c1_default_pins>;
+	pinctrl-1 = <&i2c1_sleep_pins>;
+	pinctrl-2 = <&i2c1_inactive_pins>;
+#ifndef RECOVERY_KERNEL
+	afc0: af-controller@0 {
+		compatible = "analog devices,ad5823-v4l2-i2c-subdev";
+		reg = < 0x0C >;
+	};
+	camera0: camera-module@0 {
+		compatible = "omnivision,ov5670-v4l2-i2c-subdev";
+		reg = < 0x10 >;
+		device_type = "v4l2-i2c-subdev";
+
+		pinctrl-names = "default", "sleep", "inactive";
+		pinctrl-0 = <&cam1_default_pins>;
+		pinctrl-1 = <&cam1_sleep_pins>;
+		pinctrl-2 = <&cam1_inactive_pins>;
+
+#if defined (CONFIG_Z370C) || defined (CONFIG_Z370CG)
+		intel,pd-gpio = <&xgold_pmx_gpio 68 0>;
+#else
+		intel,pd-gpio = <&xgold_pmx_gpio 56 0>;
+#endif
+		/*intel,rst-gpio = <&xgold_pmx_gpio 56 0>;*/
+		/*intel,pd-gpio_1v2 = <&xgold_pmx_gpio 68 0>;*/
+		intel,pd-gpio-is_active_low;
+		/*intel,rst-gpio-is_active_low;*/
+
+		pm,class-name = "generic_class";
+		pm,user-name = "primcam";
+		pm,state-D0 = "enable";
+		pm,state-D3 = "disable";
+
+		/* ["front","back"] */
+		intel,camera-module-facing = "back";
+		/* ["landscape","landscape-flipped","portrait","portrait-flipped"] */
+		intel,camera-module-mounting = "landscape";
+		intel,camera-module-flash-support = <1>;
+		intel,camera-module-flash-exp-time = <5000>;
+		intel,af-ctrl = <&afc0>;
+		intel,camera-module-csi-config-0 {
+			intel,csi-pixels-per-second = <0>;
+			intel,csi-vc = <0>;
+			intel,csi-lanes = <2>;
+			intel,csi-dphy1 = <0x60A02C1>;
+			intel,csi-dphy2 = <0x00>;
+			intel,csi-ana-bandgap-bias = <3>;
+		};
+	};
+
+	camera1: camera-module@1 {
+		compatible = "himax,hm2051-v4l2-i2c-subdev";
+		reg = < 0x24 >;
+		device_type = "v4l2-i2c-subdev";
+
+		pinctrl-names = "default", "sleep", "inactive";
+#if !defined (CONFIG_Z370C) && !defined (CONFIG_Z370CG)
+		pinctrl-0 = <&cam1_default_pins>;
+		pinctrl-1 = <&cam1_sleep_pins>;
+		pinctrl-2 = <&cam1_inactive_pins>;
+		intel,rst-gpio = <&xgold_pmx_gpio 56 0>;
+#else
+		pinctrl-0 = <&cam2_default_pins>;
+		pinctrl-1 = <&cam2_sleep_pins>;
+		pinctrl-2 = <&cam2_inactive_pins>;
+                intel,rst-gpio = <&xgold_pmx_gpio 14 0>;
+#endif
+		intel,rst-gpio-is_active_low;
+
+		pm,class-name = "generic_class";
+		pm,user-name = "primcam";
+		pm,state-D0 = "enable";
+		pm,state-D3 = "disable";
+
+		/* ["front","back"] */
+#if !defined (CONFIG_Z370C) && !defined (CONFIG_Z370CG)
+		intel,camera-module-facing = "back";
+#else
+                intel,camera-module-facing = "front";
+#endif
+		/* ["landscape","landscape-flipped","portrait","portrait-flipped"] */
+		intel,camera-module-mounting = "landscape";
+
+		intel,camera-module-csi-config-0 {
+			intel,csi-pixels-per-second = <0>;
+			intel,csi-vc = <0>;
+			intel,csi-lanes = <1>;
+			intel,csi-dphy1 = <0x60152A9>;
+			intel,csi-dphy2 = <0x00>;
+			intel,csi-ana-bandgap-bias = <3>;
+		};
+	};
+
+	camera2: camera-module@2 {
+		compatible = "galaxycore,gc0310-v4l2-i2c-subdev";
+		reg = < 0x21 >;
+		device_type = "v4l2-i2c-subdev";
+
+		pinctrl-names = "default", "sleep", "inactive";
+		pinctrl-0 = <&cam2_default_pins>;
+		pinctrl-1 = <&cam2_sleep_pins>;
+		pinctrl-2 = <&cam2_inactive_pins>;
+
+		intel,pd-gpio = <&xgold_pmx_gpio 14 0>;
+
+		pm,class-name = "generic_class";
+		pm,user-name = "seccam";
+		pm,state-D0 = "enable";
+		pm,state-D3 = "disable";
+
+		/* ["front","back"] */
+		intel,camera-module-facing = "front";
+		/* ["landscape","landscape-flipped","portrait","portrait-flipped"] */
+		intel,camera-module-mounting = "landscape";
+		/*intel,camera-module-flash-support = <1>;
+		intel,camera-module-flash-exp-time = <5000>;*/
+
+		intel,camera-module-csi-config-0 {
+			intel,csi-pixels-per-second = <0>;
+			intel,csi-vc = <0>;
+			intel,csi-lanes = <1>;
+			intel,csi-dphy1 = <0x61842C1>;
+			intel,csi-dphy2 = <0x00>;
+			intel,csi-ana-bandgap-bias = <3>;
+		};
+	};
+
+	camera3: camera-module@3 {
+		compatible = "icatch,spca700xa_16mp-v4l2-i2c-subdev";
+		reg = < 0x3C >;
+		device_type = "v4l2-i2c-subdev";
+
+                intel,pd-gpio = <&xgold_pmx_gpio 68 0>;  /* isp suspend evb=65 SR=68 */
+#if defined (CONFIG_Z370C) || defined (CONFIG_Z370CG)
+		icatch,pd-gpio_1v2 = <&xgold_pmx_gpio 74 0>; /* evb=64 SR=73 ER=74 */
+		icatch,pd-gpio_1v2_sr = <&xgold_pmx_gpio 73 0>; /* evb=64 SR=73 */
+#else
+		icatch,pd-gpio_1v2 = <&xgold_pmx_gpio 73 0>; /* evb=64 SR=73 */
+#endif
+		intel,pd-gpio-is_active_high;
+#if defined (CONFIG_Z370C) || defined (CONFIG_Z370CG)
+		icatch,pd-gpio_2v8 = <&xgold_pmx_gpio 80 0>;
+#endif
+
+#if defined (CONFIG_Z370C) || defined (CONFIG_Z370CG)
+		intel,rst-gpio = <&xgold_pmx_gpio 81 0>; /* isp reset SR=81 */
+#else
+		intel,rst-gpio = <&xgold_pmx_gpio 56 0>; /*  isp reset evb=66 SR=56 */
+#endif
+		intel,rst-gpio-is_active_low;
+
+		pm,class-name = "generic_class";
+		pm,user-name = "primcam";
+		pm,state-D0 = "enable";
+		pm,state-D3 = "disable";
+
+		/* ["front","back"] */
+		intel,camera-module-facing = "back";
+		/* ["landscape","landscape-flipped","portrait","portrait-flipped"] */
+		intel,camera-module-mounting = "landscape";
+		intel,camera-module-flash-support = <1>;
+		intel,camera-module-flash-exp-time = <5000>;
+
+		/*intel,af-ctrl = <&afc0>;*/
+
+		intel,camera-module-csi-config-0 {
+			intel,csi-pixels-per-second = <0>;
+			intel,csi-vc = <0>;
+			intel,csi-lanes = <4>;
+			intel,csi-dphy1 = <0x608c283>;
+			intel,csi-dphy2 = <0x00>;
+			intel,csi-ana-bandgap-bias = <3>;
+		};
+	};
+
+	camera4: camera-module@4 {
+		compatible = "icatch,spca700xa_16mpf-v4l2-i2c-subdev";
+		reg = < 0x48 >;
+		device_type = "v4l2-i2c-subdev";
+
+                intel,pd-gpio = <&xgold_pmx_gpio 68 0>; /* isp suspend evb=65 SR=68 */
+#if defined (CONFIG_Z370C) || defined (CONFIG_Z370CG)
+		icatch,pd-gpio_1v2 = <&xgold_pmx_gpio 74 0>; /* evb=64 SR=73 ER=74 */
+		icatch,pd-gpio_1v2_sr = <&xgold_pmx_gpio 73 0>; /* evb=64 SR=73 */
+#else
+		icatch,pd-gpio_1v2 = <&xgold_pmx_gpio 73 0>; /* evb=64 SR=73 */
+#endif
+		intel,pd-gpio-is_active_high;
+#if defined (CONFIG_Z370C) || defined (CONFIG_Z370CG)
+		icatch,pd-gpio_2v8 = <&xgold_pmx_gpio 80 0>;
+#endif
+
+#if defined (CONFIG_Z370C) || defined (CONFIG_Z370CG)
+		intel,rst-gpio = <&xgold_pmx_gpio 81 0>; /* isp reset SR=81 */
+#else
+		intel,rst-gpio = <&xgold_pmx_gpio 56 0>; /*  isp reset evb=66 SR=56 */
+#endif
+		intel,rst-gpio-is_active_low;
+
+		pm,class-name = "generic_class";
+		pm,user-name = "seccam";
+		pm,state-D0 = "enable";
+		pm,state-D3 = "disable";
+
+		/* ["front","back"] */
+		intel,camera-module-facing = "front";
+		/* ["landscape","landscape-flipped","portrait","portrait-flipped"] */
+		intel,camera-module-mounting = "landscape";
+		intel,camera-module-flash-support = <1>;
+		intel,camera-module-flash-exp-time = <5000>;
+
+		/*intel,af-ctrl = <&afc0>;*/
+
+		intel,camera-module-csi-config-0 {
+			intel,csi-pixels-per-second = <0>;
+			intel,csi-vc = <0>;
+			intel,csi-lanes = <4>;
+			intel,csi-dphy1 = <0x608c283>;
+			intel,csi-dphy2 = <0x00>;
+			intel,csi-ana-bandgap-bias = <3>;
+		};
+	};
+#endif
+};
+
+&i2c_3 {
+	pinctrl-names = "default", "sleep", "inactive";
+	pinctrl-0 = <&i2c3_default_pins>;
+	pinctrl-1 = <&i2c3_sleep_pins>;
+	pinctrl-2 = <&i2c3_inactive_pins>;
+
+ #ifndef RECOVERY_KERNEL  
+ #if defined (CONFIG_Z170C) || defined (CONFIG_Z170CG)      
+    bma2x2 {
+    	compatible = "bosch,bma2x2,sr";
+		reg = < 0x18 >;
+		interrupt-parent = <&eint>;
+		interrupts = < EINT_EXI5 XGOLD_IRQ_TYPE_EDGE_RISING >;
+		pinctrl-names = "default", "sleep", "inactive";
+		pinctrl-0 = <&accel_default_pins>;
+		pinctrl-1 = <&accel_sleep_pins>;
+		pinctrl-2 = <&accel_inactive_pins>;
+		bma2x2,bma2x2-gpio-irq = <&xgold_pmx_gpio 50 0>;
+		bmm2x2,place = <5>;
+	};
+	
+	capsensor {
+		compatible = "smsc,cap1106,sr";
+		reg = < 0x28 >;
+		interrupt-parent = <&eint>;
+		interrupts = < EINT_EXI7 XGOLD_IRQ_TYPE_EDGE_FALLING >;
+		pinctrl-names = "default", "sleep", "inactive";
+		pinctrl-0 = <&cap_default_pins>;
+		pinctrl-1 = <&cap_sleep_pins>;
+		pinctrl-2 = <&cap_inactive_pins>;
+		smsc,cap1106-gpio-irq = <&xgold_pmx_gpio 70 0>;
+	};
+#endif //end of Z170CG
+
+#if defined (CONFIG_Z370C) || defined (CONFIG_Z370CG) 
+    bmc156 {
+		compatible = "bosch,bmc156,sr";
+		reg = < 0x11 >;
+		interrupt-parent = <&eint>;
+		interrupts = < EINT_EXI5 XGOLD_IRQ_TYPE_EDGE_RISING >;
+		pinctrl-names = "default", "sleep", "inactive";
+		pinctrl-0 = <&accel_default_pins>;
+		pinctrl-1 = <&accel_sleep_pins>;
+		pinctrl-2 = <&accel_inactive_pins>;
+		bmc156,bmc156-gpio-irq = <&xgold_pmx_gpio 50 0>;
+		bmc156,place = <6>;
+	};
+	
+	bmm050 {
+		compatible = "bosch,bmm050,sr";
+		reg = < 0x13 >;
+		interrupt-parent = <&eint>;
+		bmm050,place = <6>;
+	};
+	
+	proxsensor {
+		compatible = "dynaimage,ap3223,sr";
+		reg = < 0x1c >;
+		interrupt-parent = <&eint>;
+		interrupts = < EINT_EXI13 XGOLD_IRQ_TYPE_EDGE_FALLING >;
+	    pinctrl-names = "default", "sleep", "inactive";
+		pinctrl-0 = <&prox_default_pins>;
+		pinctrl-1 = <&prox_inactive_pins>;
+		pinctrl-2 = <&prox_sleep_pins>;
+		asus,psensor-irq = <&xgold_pmx_gpio 64 0>;
+		};
+#endif //end of Z370CG
+#endif //end of RECOVERY_KERNEL
+
+
+#ifndef RECOVERY_KERNEL
+#ifdef CONFIG_TOUCHSCREEN_FT3X27
+touchscreen-focal {
+		compatible = "focaltech,ft3x27,er2";
+		focaltech,name = "ft3x27";
+		reg = < 0x38 >;
+		interrupt-parent = <&eint>;
+		interrupts = < EINT_EXI1 XGOLD_IRQ_TYPE_EDGE_FALLING >;
+		pinctrl-names = "default", "sleep", "inactive";
+		pinctrl-0 = <&touch_default_pins_er2>;
+		pinctrl-1 = <&touch_sleep_pins_er2>;
+		pinctrl-2 = <&touch_inactive_pins_er2>;
+		focaltech,reset-gpio = <&xgold_pmx_gpio 63 0>;
+#if defined (CONFIG_Z370C) || defined (CONFIG_Z370CG)
+		focaltech,tp_en-gpio = <&xgold_pmx_gpio 59 0>;
+#endif
+		focaltech,irq-gpio = <&xgold_pmx_gpio 54 0>;
+		pm,class-name = "ft3x17_class";
+		pm,user-name = "ext_tp";
+		pm,state-D0 = "enable";
+		pm,state-D3 = "disable";
+#if defined (CONFIG_Z170C) || defined (CONFIG_Z170CG)
+		focaltech,panel-coords = <0 0 600 1024>;
+		focaltech,display-coords = <0 0 600 1024>;
+#endif
+#if defined (CONFIG_Z370C) || defined (CONFIG_Z370CG)
+		focaltech,panel-coords = <0 0 800 1280>;
+		focaltech,display-coords = <0 0 800 1280>;
+#endif
+		focaltech,button-map= <139 102 158>;
+		focaltech,no-force-update;
+		focaltech,i2c-pull-up;
+		focaltech,group-id = <1>;
+		focaltech,hard-reset-delay-ms = <20>;
+		focaltech,soft-reset-delay-ms = <200>;
+		focaltech,num-max-touches = <5>;
+		focaltech,fw-delay-aa-ms = <30>;
+		focaltech,fw-delay-55-ms = <30>;
+		focaltech,fw-upgrade-id1 = <0x79>;
+		focaltech,fw-upgrade-id2 = <0x18>;
+		focaltech,fw-delay-readid-ms = <10>;
+		focaltech,fw-delay-era-flsh-ms = <2000>;
+		focaltech,fw-auto-cal;
+		focaltech,ignore-id-check;
+	};
+#endif
+
+#if defined (CONFIG_Z170C) || defined (CONFIG_Z170CG)
+#ifdef CONFIG_TOUCHSCREEN_HIMAX
+touchscreen-himax {
+		compatible = "himax,852xes";
+		reg = < 0x48 >;
+		interrupt-parent = <&eint>;
+		interrupts = < EINT_EXI1 XGOLD_IRQ_TYPE_EDGE_FALLING >;
+		pinctrl-names = "default", "sleep", "inactive";
+		pinctrl-0 = <&touch_default_pins_er2>;
+		pinctrl-1 = <&touch_sleep_pins_er2>;
+		pinctrl-2 = <&touch_inactive_pins_er2>;
+		himax,rst-gpio = <&xgold_pmx_gpio 63 0>;
+		himax,irq-gpio = <&xgold_pmx_gpio 54 0>;
+		pm,class-name = "himax_852xES_class";
+		pm,user-name = "ext_tp";
+		pm,state-D0 = "enable";
+		pm,state-D3 = "disable";
+		himax,panel-coords = <0 600 0 1024>;
+		himax,display-coords = <0 600 0 1024>;
+		report_type = <1>;
+	};
+#endif
+#endif
+#endif
+};
+
+
+&i2c_4 {
+	pinctrl-names = "default", "sleep", "inactive";
+	pinctrl-0 = <&i2c4_default_pins>;
+	pinctrl-1 = <&i2c4_sleep_pins>;
+	pinctrl-2 = <&i2c4_inactive_pins>;
+	intel,i2c,gpio-sda = <&xgold_pmx_gpio 88 0>;
+	intel,i2c,gpio-scl = <&xgold_pmx_gpio 89 0>;
+#ifndef RECOVERY_KERNEL
+#ifdef CONFIG_TOUCHSCREEN_FT3X27
+touchscreen-focal {
+		compatible = "focaltech,ft3x27,sr";
+		focaltech,name = "ft3x27";
+		reg = < 0x38 >;
+		interrupt-parent = <&eint>;
+		interrupts = < EINT_EXI1 XGOLD_IRQ_TYPE_EDGE_FALLING >;
+		pinctrl-names = "default", "sleep", "inactive";
+		pinctrl-0 = <&touch_default_pins>;
+		pinctrl-1 = <&touch_sleep_pins>;
+		pinctrl-2 = <&touch_inactive_pins>;
+#if defined (CONFIG_Z170C) || defined (CONFIG_Z170CG)
+		focaltech,reset-gpio = <&xgold_pmx_gpio 14 0>;
+#endif
+#if defined (CONFIG_Z370C) || defined (CONFIG_Z370CG)
+		focaltech,reset-gpio = <&xgold_pmx_gpio 63 0>;
+		focaltech,tp_en-gpio = <&xgold_pmx_gpio 59 0>;
+#endif
+		focaltech,irq-gpio = <&xgold_pmx_gpio 54 0>;
+		pm,class-name = "ft3x17_class";
+		pm,user-name = "ext_tp";
+		pm,state-D0 = "enable";
+		pm,state-D3 = "disable";
+#if defined (CONFIG_Z170C) || defined (CONFIG_Z170CG)
+		focaltech,panel-coords = <0 0 600 1024>;
+		focaltech,display-coords = <0 0 600 1024>;
+#endif
+#if defined (CONFIG_Z370C) || defined (CONFIG_Z370CG)
+		focaltech,panel-coords = <0 0 800 1280>;
+		focaltech,display-coords = <0 0 800 1280>;
+#endif
+		focaltech,button-map= <139 102 158>;
+		focaltech,no-force-update;
+		focaltech,i2c-pull-up;
+		focaltech,group-id = <1>;
+		focaltech,hard-reset-delay-ms = <20>;
+		focaltech,soft-reset-delay-ms = <200>;
+		focaltech,num-max-touches = <5>;
+		focaltech,fw-delay-aa-ms = <30>;
+		focaltech,fw-delay-55-ms = <30>;
+		focaltech,fw-upgrade-id1 = <0x79>;
+		focaltech,fw-upgrade-id2 = <0x18>;
+		focaltech,fw-delay-readid-ms = <10>;
+		focaltech,fw-delay-era-flsh-ms = <2000>;
+		focaltech,fw-auto-cal;
+		focaltech,ignore-id-check;
+	};
+#endif
+
+#if defined (CONFIG_Z170C) || defined (CONFIG_Z170CG)      
+    bma2x2 {
+    	compatible = "bosch,bma2x2,er2";
+		reg = < 0x18 >;
+		interrupt-parent = <&eint>;
+		interrupts = < EINT_EXI5 XGOLD_IRQ_TYPE_EDGE_RISING >;
+		pinctrl-names = "default", "sleep", "inactive";
+		pinctrl-0 = <&accel_default_pins>;
+		pinctrl-1 = <&accel_sleep_pins>;
+		pinctrl-2 = <&accel_inactive_pins>;
+		bma2x2,bma2x2-gpio-irq = <&xgold_pmx_gpio 50 0>;
+		bmm2x2,place = <5>;
+	};
+	
+	capsensor {
+		compatible = "smsc,cap1106,er2";
+		reg = < 0x28 >;
+		interrupt-parent = <&eint>;
+		interrupts = < EINT_EXI7 XGOLD_IRQ_TYPE_EDGE_FALLING >;
+		pinctrl-names = "default", "sleep", "inactive";
+		pinctrl-0 = <&cap_default_pins>;
+		pinctrl-1 = <&cap_sleep_pins>;
+		pinctrl-2 = <&cap_inactive_pins>;
+		smsc,cap1106-gpio-irq = <&xgold_pmx_gpio 70 0>;
+	};
+#endif //end of Z170CG
+
+#if defined (CONFIG_Z370C) || defined (CONFIG_Z370CG) 
+    bmc156 {
+		compatible = "bosch,bmc156,er2";
+		reg = < 0x11 >;
+		interrupt-parent = <&eint>;
+		interrupts = < EINT_EXI5 XGOLD_IRQ_TYPE_EDGE_RISING >;
+		pinctrl-names = "default", "sleep", "inactive";
+		pinctrl-0 = <&accel_default_pins>;
+		pinctrl-1 = <&accel_sleep_pins>;
+		pinctrl-2 = <&accel_inactive_pins>;
+		bmc156,bmc156-gpio-irq = <&xgold_pmx_gpio 50 0>;
+		bmc156,place = <6>;
+	};
+	
+	bmm050 {
+		compatible = "bosch,bmm050,er2";
+		reg = < 0x13 >;
+		interrupt-parent = <&eint>;
+		bmm050,place = <6>;
+	};
+	
+	proxsensor {
+		compatible = "dynaimage,ap3223,er2";
+		reg = < 0x1c >;
+		interrupt-parent = <&eint>;
+		interrupts = < EINT_EXI13 XGOLD_IRQ_TYPE_EDGE_FALLING >;
+	    pinctrl-names = "default", "sleep", "inactive";
+		pinctrl-0 = <&prox_default_pins>;
+		pinctrl-1 = <&prox_inactive_pins>;
+		pinctrl-2 = <&prox_sleep_pins>;
+		asus,psensor-irq = <&xgold_pmx_gpio 64 0>;
+		};
+#endif //end of Z370CG of sensors
+#endif
+};
+
+&i2c_5 {
+	pinctrl-names = "default", "sleep", "inactive";
+	pinctrl-0 = <&i2c5_agold_default_pins>;
+	pinctrl-1 = <&i2c5_agold_sleep_pins>;
+	pinctrl-2 = <&i2c5_agold_inactive_pins>;
+	intel,i2c,gpio-sda = <&abb_pmx_gpio 17 0>;
+	intel,i2c,gpio-scl = <&abb_pmx_gpio 16 0>;
+#if defined (CONFIG_Z370C) || defined (CONFIG_Z370CG)
+       sony_cadiz@11 {
+               compatible = "sony_cadiz,cxd4756gf";
+               reg = <0x11>;
+/*           avdd-supply = <&pm8909_l17>;  */
+/*           vdd-supply = <&pm8909_l6>;  */
+               pinctrl-names = "cadiz_default","cadiz_inactive","cadiz_sleep";
+               pinctrl-0 = <&cadiz_default_pins>;
+               pinctrl-1 = <&cadiz_inactive_pins>;
+               pinctrl-2 = <&cadiz_sleep_pins>;
+               sony_cadiz,lcm_vhigh_gpio = <&xgold_pmx_gpio 45 0x1500>;
+               sony_cadiz,lcm_bl_enable_gpio = <&xgold_pmx_gpio 46 0>;
+               sony_cadiz,rst_gpio = <&xgold_pmx_gpio 77 0x300>;
+               sony_cadiz,pwr_en_gpio = <&xgold_pmx_gpio 75 0x300>;
+               sony_cadiz,sysclk_en_gpio = <&xgold_pmx_gpio 76 0x300>;
+       };
+	bat3:battery3 {
+		compatible = "intel,smb358_charger";
+		reg = < 0x6c >;
+		pinctrl-names = "default", "sleep", "inactive";
+		pinctrl-0 = < &chg2_default_pins >;
+		pinctrl-1 = < &chg2_sleep_pins >;
+		pinctrl-2 = < &chg2_inactive_pins >;
+		mult-i2c-en = < &xgold_pmx_gpio 15 0 >;
+		asus,cover-irq = <&xgold_pmx_gpio 73 0>;
+	};
+	bat4:battery4 {
+		compatible = "intel,ug31xx_battery";
+		reg = < 0x70 >;
+	};
+#endif
+	bat:battery {
+		compatible = "intel,smb345_charger";
+		reg = < 0x6a >;
+		interrupts = < 0 1 2 >;
+		interrupt-parent = < &bat >;
+		#interrupt-cells = < 1 >;
+		interrupt-map = < 0 &ag620_pmu ABB_PMU_CI XGOLD_IRQ_TYPE_NONE 1 &ag620_pmu ABB_PMU_CSTAT XGOLD_IRQ_TYPE_EDGE_BOTH 2 &eint EINT_EXI15 XGOLD_IRQ_TYPE_EDGE_BOTH >; /* CI */
+		pinctrl-names = "default", "sleep", "inactive";
+		pinctrl-0 = < &chg_agold_default_pins >;
+		pinctrl-1 = < &chg_agold_sleep_pins >;
+		pinctrl-2 = < &chg_agold_inactive_pins >;
+		chg-otg-enable = < &xgold_pmx_gpio 47 0 >;
+		vbus-detect-enable = < &xgold_pmx_gpio 66 0 >;
+		cover-chg-en = < &xgold_pmx_gpio 78 0 >;
+		asus,cover-irq = <&xgold_pmx_gpio 73 0>;
+		intel,chgint-debounce = < 50 >;
+	};
+
+	bat2:battery2 {
+		compatible = "intel,sn200007-battery";
+		reg = < 0x55 >;
+	};
+
+#if defined (CONFIG_Z370C) || defined (CONFIG_Z370CG)
+	eep:eeprom1 {
+		compatible = "intel,ht24lc02_eeprom";
+		reg = < 0x51 >;
+	};
+#endif
+
+};
+
+&gnss {
+	pinctrl-names = "default", "sleep", "inactive", "default_lna", "inactive_lna", "default_fta", "inactive_fta", "gnss_default", "gnss_inactive";
+	pinctrl-0 = <&tcxo_agold_default_pins>;
+	pinctrl-1 = <&tcxo_agold_sleep_pins>;
+	pinctrl-2 = <&tcxo_agold_inactive_pins>;
+	pinctrl-3 = <&ext_agold_default_pins>;
+	pinctrl-4 = <&ext_agold_sleep_pins>;
+	pinctrl-5 = <&gnss_agold_default_pins>;
+	pinctrl-6 = <&gnss_agold_sleep_pins>;
+	pinctrl-7 = <&gnss_default_pins>;
+	pinctrl-8 = <&gnss_inactive_pins>;
+};
+
+#ifndef RECOVERY_KERNEL
+&afe {
+	pinctrl-names = "default", "sleep", "inactive";
+	pinctrl-0 = <&dm_agold_default_pins>;
+	pinctrl-1 = <&dm_agold_sleep_pins>;
+	pinctrl-2 = <&dm_agold_inactive_pins>;
+};
+#endif
+
+&sd {
+	intel,tap_values = <0x0C41020 0x0C41020 0x0C41020 0x04f4120 0x0C41020 0x0F40F20 0x0F40F20>;
+	pinctrl-names = "default", "sleep", "inactive";
+	pinctrl-0 = <&sdmmc_default_pins>;
+	pinctrl-1 = <&sdmmc_sleep_pins>;
+	pinctrl-2 = <&sdmmc_inactive_pins>;
+	gpios = <&xgold_pmx_gpio 43 0>;
+};
+
+&emmc {
+#if defined (CONFIG_Z170C) || defined (CONFIG_Z170CG)
+	intel,tap_values =          < 0x00c50821  0x006f0821   0x00c50821  0x004f0821  0x00c50821  0x00a50711  0x00c50821 >;
+	intel,tap_values_kingston = < 0x00c40721  0x006f0621   0x00c40720  0x004e0720  0x00c40720  0x00e50711  0x00c40820 >;
+	intel,tap_values_samsung =  < 0x00c50821  0x006f0C21   0x00c50821  0x004f0821  0x00c50821  0x00a50A11  0x00c50821 >;
+	intel,tap_values_hynix =    < 0x00c50821  0x006f0821   0x00c50821  0x004f0821  0x00c50821  0x00a50811  0x00c50821 >;
+#elif defined (CONFIG_Z370C) || defined (CONFIG_Z370CG)
+	intel,tap_values =          < 0x00c50821  0x006f0821   0x00c50821  0x004f0821  0x00c50821  0x00a50711  0x00c50821 >;
+	intel,tap_values_kingston = < 0x00c40721  0x006f0621   0x00c40720  0x004e0720  0x00c40720  0x00e50711  0x00c40820 >;
+	intel,tap_values_samsung =  < 0x00c50821  0x006f0D21   0x00c50821  0x004f0821  0x00c50821  0x00a50A11  0x00c50821 >;
+	intel,tap_values_hynix =    < 0x00c50821  0x006f0821   0x00c50821  0x004f0821  0x00c50821  0x00a50811  0x00c50821 >;
+#endif
+	pinctrl-names = "default", "sleep", "inactive";
+	pinctrl-0 = <&emmc_default_pins>;
+	pinctrl-1 = <&emmc_sleep_pins>;
+	pinctrl-2 = <&emmc_inactive_pins>;
+
+};
+
+&usb {
+	pinctrl-names = "default", "sleep", "inactive";
+	pinctrl-0 = <&usb_default_pins>;
+	pinctrl-1 = <&usb_sleep_pins>;
+	pinctrl-2 = <&usb_inactive_pins>;
+};
+
+&keypad {
+	pinctrl-names = "default", "sleep", "inactive";
+	pinctrl-0 = <&kp_default_pins>;
+	pinctrl-1 = <&kp_sleep_pins>;
+	pinctrl-2 = <&kp_inactive_pins>;
+	keypad,num-rows = <9>;
+	keypad,num-columns = <8>;
+	keypad,rows = <3 8>;
+	keypad,columns = <3 4>;
+	linux,keymap = <0x08070072	/* KEY_VOLUMEDOWN */
+			0x08060073	/* KEY_VOLUMEUP */
+			0x08030074	/* KEY_POWER */
+			0x08040066>;	/* KEY_HOME */
+};
+
+&vop {
+	status = "okay";
+	rockchip,fb-win-map = <FB_DEFAULT_ORDER>;
+};
+
+#ifndef RECOVERY_KERNEL
+&cif {
+	intel,camera-modules-attached = <&camera0 &camera1 &camera2 &camera3 &camera4>;
+};
+#endif
+
+#include "xgold/sofia_3gr_soc/pinctrl-sf_3gr-sr-garnet.dtsi"
+#include "xgold/agold620/pinctrl-sf_3gr-sr-garnet.dtsi"

@@ -1,0 +1,11 @@
+config TOUCHSCREEN_HIMAX
+	tristate "HIMAX HM852xES serious i2c touchscreen"
+		depends on I2C
+		help
+		This enables support for HIMAX HM852xES over I2C based touchscreens.
+
+config TOUCHSCREEN_HIMAX_DEBUG
+	tristate "HIMAX HM852xES debug function"
+		depends on TOUCHSCREEN_HIMAX
+		help
+		This enables support for HIMAX HM852xES debug function.	

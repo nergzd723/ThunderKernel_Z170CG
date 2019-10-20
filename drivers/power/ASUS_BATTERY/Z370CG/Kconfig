@@ -1,0 +1,50 @@
+#
+#  Battery driver configuration
+#
+
+menuconfig ASUS_Z370CG_BATTERY
+	bool "ASUS Z370CG Battery support"
+	help
+	  Say Y here. This option doesn't affect the kernel.
+	  If unsure, say Y.
+
+if ASUS_Z370CG_BATTERY
+
+config CHARGER_SMB347_Z370CG
+	tristate "Summit Microelectronics SMB347 Battery Charger"
+	depends on I2C
+	depends on IDI
+	default n
+	help
+	  Say Y to include support for Summit Microelectronics
+	  SMB347 Battery Charger.
+
+config GAUGE_SN700002_Z370CG
+	tristate "TI bq27621 battery gauge driver"
+	depends on I2C
+	depends on IDI
+	default n
+	help
+	  Say Y to include support for TI bq27621
+	  battery gauge driver.
+
+config COVER_CHARGER_SMB358_Z370CG
+	tristate "Summit Microelectronics SMB358 Battery Charger"
+	depends on I2C
+	depends on IDI
+	default n
+	help
+	  Say Y to include support for Summit Microelectronics
+	  SMB358 Battery Charger.
+
+config COVER_GAUGE_UG31XX_Z370CG
+	tristate "UPI UG31XX fuel gauge driver"
+	depends on I2C
+	depends on IDI
+	default n
+	help
+	  Say Y to include support for UPI
+	  UG31XX fuel gauge driver
+
+endif
+

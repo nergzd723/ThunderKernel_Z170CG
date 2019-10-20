@@ -1,0 +1,1 @@
+obj-$(CONFIG_TOUCHSCREEN_HIMAX)		= himax_852xES.o
